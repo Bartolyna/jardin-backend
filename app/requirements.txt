@@ -1,0 +1,23 @@
+# Django Core
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# Base de datos
+psycopg2-binary==2.9.8
+
+# Variables de entorno
+python-decouple==3.8
+
+# Servidor WSGI
+gunicorn==21.2.0
+
+# Utilidades
+Pillow==10.0.1
+python-dateutil==2.8.2
+
+# Seguridad
+django-ratelimit==4.1.0
+
+# Desarrollo (opcional)
+django-extensions==3.2.3

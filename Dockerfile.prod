@@ -1,0 +1,64 @@
+# Dockerfile optimizado para producción
+FROM python:3.11-slim-bullseye as builder
+
+# Variables de entorno para optimización
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Instalar dependencias del sistema necesarias para compilación
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements y instalar dependencias Python
+WORKDIR /app
+COPY app/requirements.txt .
+RUN pip install --user --no-warn-script-location -r requirements.txt
+
+# Etapa final - imagen optimizada
+FROM python:3.11-slim-bullseye
+
+# Crear usuario sin privilegios
+RUN groupadd -r django && useradd -r -g django django
+
+# Variables de entorno
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/home/django/.local/bin:$PATH
+
+# Instalar dependencias runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar dependencias compiladas desde builder
+COPY --from=builder /root/.local /home/django/.local
+
+# Configurar directorio de trabajo
+WORKDIR /app
+
+# Copiar código de aplicación
+COPY app/ .
+COPY scripts/entrypoint.sh /entrypoint.sh
+
+# Crear directorios necesarios
+RUN mkdir -p /app/staticfiles /app/mediafiles /app/logs
+
+# Asignar permisos
+RUN chmod +x /entrypoint.sh && \
+    chown -R django:django /app /entrypoint.sh /home/django/.local
+
+# Cambiar a usuario sin privilegios
+USER django
+
+# Puerto de exposición
+EXPOSE 8000
+
+# Comando de inicio
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "jardin.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
