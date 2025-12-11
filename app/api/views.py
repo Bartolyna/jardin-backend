@@ -131,6 +131,20 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return Response({'message': 'Contraseña actualizada correctamente'})
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Soft delete del usuario"""
+        usuario = self.get_object()
+        
+        # Prevenir que un usuario se elimine a sí mismo
+        if usuario.id == request.user.id:
+            return Response(
+                {'error': 'No puedes eliminar tu propia cuenta'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        usuario.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
