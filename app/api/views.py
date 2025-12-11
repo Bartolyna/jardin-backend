@@ -245,7 +245,7 @@ class AsistenciaViewSet(viewsets.ModelViewSet):
         if jornada_salon:
             queryset = queryset.filter(estudiante__jornada_salon_id=jornada_salon)
         
-        return queryset.order_by('-fecha', '-hora_llegada')
+        return queryset.order_by('-fecha', '-id')
     
     @action(detail=False, methods=['post'])
     def registrar_masivo(self, request):
