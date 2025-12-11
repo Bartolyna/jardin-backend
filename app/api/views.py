@@ -219,8 +219,8 @@ class EstudianteViewSet(viewsets.ModelViewSet):
 # ============================================
 
 class AsistenciaViewSet(viewsets.ModelViewSet):
-    queryset = Asistencia.objects.filter(is_active=True).select_related(
-        'estudiante', 'estado', 'registrado_por'
+    queryset = Asistencia.objects.select_related(
+        'estudiante', 'estado'
     )
     permission_classes = [permissions.IsAuthenticated]
     

@@ -88,11 +88,11 @@ class EstudianteAdmin(admin.ModelAdmin):
 
 @admin.register(Asistencia)
 class AsistenciaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'estudiante', 'estado', 'fecha', 'hora_llegada', 'registrado_por')
-    list_filter = ('estado', 'fecha', 'is_active')
+    list_display = ('id', 'estudiante', 'estado', 'fecha')
+    list_filter = ('estado', 'fecha')
     search_fields = ('estudiante__nombre',)
     ordering = ('-fecha', 'estudiante__nombre')
-    readonly_fields = ('created_at', 'updated_at', 'deleted_at')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(AsistenciaApoderado)

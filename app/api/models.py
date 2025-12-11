@@ -306,31 +306,21 @@ class Estudiante(BaseModel):
 # 5. TABLA ASISTENCIAS
 # ============================================
 
-class Asistencia(BaseModel):
+class Asistencia(TimeStampedModel):
     """Modelo para el registro de asistencia"""
     estudiante = models.ForeignKey(
         Estudiante,
-        on_delete=models.PROTECT,  # PROTECT en lugar de CASCADE
+        on_delete=models.PROTECT,
         related_name='asistencias',
         verbose_name="Estudiante"
     )
     estado = models.ForeignKey(
         EstadoAsistencia,
-        on_delete=models.PROTECT,  # PROTECT en lugar de CASCADE
+        on_delete=models.PROTECT,
         related_name='asistencias',
         verbose_name="Estado"
     )
     fecha = models.DateField(verbose_name="Fecha")
-    hora_llegada = models.TimeField(null=True, blank=True, verbose_name="Hora de llegada")
-    observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
-    registrado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.SET_NULL,  # SET_NULL en lugar de CASCADE
-        null=True,
-        blank=True,
-        related_name='asistencias_registradas',
-        verbose_name="Registrado por"
-    )
     
     class Meta:
         db_table = 'asistencia'

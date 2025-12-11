@@ -165,14 +165,12 @@ class AsistenciaSerializer(serializers.ModelSerializer):
     estudiante_nombre = serializers.CharField(source='estudiante.nombre', read_only=True)
     estado_nombre = serializers.CharField(source='estado.nombre', read_only=True)
     estado_color = serializers.CharField(source='estado.color', read_only=True)
-    registrado_por_nombre = serializers.CharField(source='registrado_por.nombre', read_only=True, allow_null=True)
     
     class Meta:
         model = Asistencia
         fields = [
             'id', 'estudiante', 'estudiante_nombre', 'estado', 'estado_nombre', 'estado_color',
-            'fecha', 'hora_llegada', 'observaciones', 'registrado_por', 'registrado_por_nombre',
-            'is_active', 'created_at', 'updated_at'
+            'fecha', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -182,7 +180,7 @@ class AsistenciaCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Asistencia
-        fields = ['estudiante', 'estado', 'fecha', 'hora_llegada', 'observaciones', 'registrado_por']
+        fields = ['estudiante', 'estado', 'fecha']
 
 
 # ============================================
