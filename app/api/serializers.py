@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    Rol, Jornada, Salon, EstadoAsistencia, EstadoInventario, Categoria,
+    Rol, Jornada, Salon, EstadoAsistencia, Categoria,
     Usuario, JornadaSalon, Estudiante, Asistencia, AsistenciaApoderado, Inventario,
     Cuota, Transaccion, MovimientoInventario
 )
@@ -35,13 +35,6 @@ class EstadoAsistenciaSerializer(serializers.ModelSerializer):
     class Meta:
         model = EstadoAsistencia
         fields = ['id', 'nombre', 'color', 'is_active', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
-
-
-class EstadoInventarioSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EstadoInventario
-        fields = ['id', 'nombre', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
 
@@ -204,29 +197,61 @@ class AsistenciaApoderadoSerializer(serializers.ModelSerializer):
 # ============================================
 
 class InventarioSerializer(serializers.ModelSerializer):
-    estado_nombre = serializers.CharField(source='estado.nombre', read_only=True)
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
-    responsable_nombre = serializers.CharField(source='responsable.nombre', read_only=True, allow_null=True)
+    cantidad_actual = serializers.SerializerMethodField()
     
     class Meta:
         model = Inventario
         fields = [
-            'id', 'estado', 'estado_nombre', 'categoria', 'categoria_nombre', 'codigo',
-            'nombre', 'descripcion', 'fecha_ingreso', 'fecha_baja', 'valor_compra',
-            'ubicacion', 'responsable', 'responsable_nombre', 'observacion',
+            'id', 'categoria', 'categoria_nombre', 'codigo',
+            'nombre', 'descripcion', 'ubicacion',
+            'cantidad_actual', 'stock_minimo',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'cantidad_actual']
+    
+    def get_cantidad_actual(self, obj):
+        """Calcula la cantidad actual basándose en los movimientos"""
+        from django.db.models import Sum
+        movimientos = obj.movimientos.all()
+        
+        ingresos = movimientos.filter(tipo='ingreso').aggregate(
+            total=Sum('cantidad')
+        )['total'] or 0
+        
+        egresos = movimientos.filter(tipo='egreso').aggregate(
+            total=Sum('cantidad')
+        )['total'] or 0
+        
+        return ingresos - egresos
 
 
 class InventarioListSerializer(serializers.ModelSerializer):
     """Serializer ligero para listados"""
-    estado_nombre = serializers.CharField(source='estado.nombre', read_only=True)
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
+    cantidad_actual = serializers.SerializerMethodField()
     
     class Meta:
         model = Inventario
-        fields = ['id', 'codigo', 'nombre', 'estado_nombre', 'categoria_nombre', 'is_active']
+        fields = [
+            'id', 'codigo', 'nombre', 'categoria', 'categoria_nombre',
+            'cantidad_actual', 'stock_minimo', 'ubicacion', 'is_active'
+        ]
+    
+    def get_cantidad_actual(self, obj):
+        """Calcula la cantidad actual basándose en los movimientos"""
+        from django.db.models import Sum
+        movimientos = obj.movimientos.all()
+        
+        ingresos = movimientos.filter(tipo='ingreso').aggregate(
+            total=Sum('cantidad')
+        )['total'] or 0
+        
+        egresos = movimientos.filter(tipo='egreso').aggregate(
+            total=Sum('cantidad')
+        )['total'] or 0
+        
+        return ingresos - egresos
 
 
 # ============================================
@@ -348,38 +373,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
             'registrado_por', 'registrado_por_nombre',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'cantidad_anterior', 'cantidad_nueva']
-    
-    def validate(self, data):
-        """Validar y calcular cantidades antes y después del movimiento"""
-        item = data.get('item')
-        tipo = data.get('tipo')
-        cantidad = data.get('cantidad')
-        
-        if item:
-            data['cantidad_anterior'] = item.cantidad
-            
-            if tipo == 'ingreso':
-                data['cantidad_nueva'] = item.cantidad + cantidad
-            else:  # egreso
-                if item.cantidad < cantidad:
-                    raise serializers.ValidationError({
-                        'cantidad': f'No hay suficiente stock. Disponible: {item.cantidad}'
-                    })
-                data['cantidad_nueva'] = item.cantidad - cantidad
-        
-        return data
-    
-    def create(self, validated_data):
-        """Crear movimiento y actualizar inventario"""
-        movimiento = super().create(validated_data)
-        
-        # Actualizar cantidad en inventario
-        item = movimiento.item
-        item.cantidad = movimiento.cantidad_nueva
-        item.save()
-        
-        return movimiento
+        read_only_fields = ['created_at', 'updated_at', 'cantidad_anterior', 'cantidad_nueva', 'registrado_por']
 
 
 class MovimientoInventarioListSerializer(serializers.ModelSerializer):

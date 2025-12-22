@@ -381,45 +381,21 @@ class AsistenciaApoderado(TimeStampedModel):
 
 class Inventario(BaseModel):
     """Modelo para el inventario"""
-    estado = models.ForeignKey(
-        EstadoInventario,
-        on_delete=models.PROTECT,  # PROTECT en lugar de CASCADE
-        related_name='inventarios',
-        verbose_name="Estado"
-    )
     categoria = models.ForeignKey(
         Categoria,
-        on_delete=models.PROTECT,  # PROTECT en lugar de CASCADE
+        on_delete=models.PROTECT,
         related_name='inventarios',
         verbose_name="Categoría"
     )
     codigo = models.CharField(max_length=50, unique=True, verbose_name="Código")
     nombre = models.CharField(max_length=100, verbose_name="Nombre")
     descripcion = models.TextField(blank=True, null=True, verbose_name="Descripción")
-    
-    # Fechas
-    fecha_ingreso = models.DateField(verbose_name="Fecha de ingreso")
-    fecha_baja = models.DateField(null=True, blank=True, verbose_name="Fecha de baja")
-    
-    # Información adicional
-    valor_compra = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(0)],
-        verbose_name="Valor de compra"
-    )
     ubicacion = models.CharField(max_length=100, null=True, blank=True, verbose_name="Ubicación")
-    responsable = models.ForeignKey(
-        Usuario,
-        on_delete=models.SET_NULL,  # SET_NULL en lugar de CASCADE
-        null=True,
-        blank=True,
-        related_name='inventarios_responsable',
-        verbose_name="Responsable"
+    stock_minimo = models.IntegerField(
+        default=5,
+        validators=[MinValueValidator(0)],
+        verbose_name="Stock mínimo"
     )
-    observacion = models.TextField(null=True, blank=True, verbose_name="Observaciones")
     
     class Meta:
         db_table = 'inventario'
@@ -428,20 +404,12 @@ class Inventario(BaseModel):
         indexes = [
             models.Index(fields=['codigo'], name='idx_inventario_codigo'),
             models.Index(fields=['categoria'], name='idx_inventario_categoria'),
-            models.Index(fields=['estado'], name='idx_inventario_estado'),
             models.Index(fields=['is_active'], name='idx_inventario_activo'),
         ]
         ordering = ['codigo']
     
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
-    
-    def dar_de_baja(self, motivo=None):
-        """Da de baja un item del inventario"""
-        self.fecha_baja = timezone.now().date()
-        if motivo:
-            self.observacion = f"{self.observacion or ''}\nBaja: {motivo}".strip()
-        self.soft_delete()
 
 
 # ============================================

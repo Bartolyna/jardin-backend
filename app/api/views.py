@@ -8,13 +8,13 @@ from django.contrib.auth import login, logout
 from datetime import datetime, date, timedelta
 
 from .models import (
-    Rol, Jornada, Salon, EstadoAsistencia, EstadoInventario, Categoria,
+    Rol, Jornada, Salon, EstadoAsistencia, Categoria,
     Usuario, JornadaSalon, Estudiante, Asistencia, AsistenciaApoderado, Inventario,
     Cuota, Transaccion, MovimientoInventario
 )
 from .serializers import (
     RolSerializer, JornadaSerializer, SalonSerializer,
-    EstadoAsistenciaSerializer, EstadoInventarioSerializer, CategoriaSerializer,
+    EstadoAsistenciaSerializer, CategoriaSerializer,
     UsuarioSerializer, UsuarioListSerializer, JornadaSalonSerializer,
     EstudianteSerializer,
     AsistenciaSerializer, AsistenciaCreateSerializer,
@@ -72,12 +72,6 @@ class SalonViewSet(viewsets.ModelViewSet):
 class EstadoAsistenciaViewSet(viewsets.ModelViewSet):
     queryset = EstadoAsistencia.objects.filter(is_active=True)
     serializer_class = EstadoAsistenciaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class EstadoInventarioViewSet(viewsets.ModelViewSet):
-    queryset = EstadoInventario.objects.filter(is_active=True)
-    serializer_class = EstadoInventarioSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 
@@ -364,8 +358,8 @@ class AsistenciaApoderadoViewSet(viewsets.ModelViewSet):
 
 class InventarioViewSet(viewsets.ModelViewSet):
     queryset = Inventario.objects.filter(is_active=True).select_related(
-        'estado', 'categoria', 'responsable'
-    )
+        'categoria'
+    ).prefetch_related('movimientos')
     permission_classes = [permissions.IsAuthenticated]
     
     def get_serializer_class(self):
@@ -375,12 +369,9 @@ class InventarioViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        estado = self.request.query_params.get('estado')
         categoria = self.request.query_params.get('categoria')
         search = self.request.query_params.get('search')
         
-        if estado:
-            queryset = queryset.filter(estado_id=estado)
         if categoria:
             queryset = queryset.filter(categoria_id=categoria)
         if search:
@@ -392,19 +383,57 @@ class InventarioViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-created_at')
     
-    @action(detail=True, methods=['post'])
-    def dar_de_baja(self, request, pk=None):
-        item = self.get_object()
-        observacion = request.data.get('observacion', '')
+    def perform_create(self, serializer):
+        """Crea el item y registra movimiento inicial si hay cantidad_actual"""
+        # Guardar el item
+        instance = serializer.save()
         
-        try:
-            item.dar_de_baja(observacion)
-            return Response({'message': 'Item dado de baja correctamente'})
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
+        # Si se envió cantidad_actual, crear movimiento de ingreso inicial
+        cantidad_inicial = self.request.data.get('cantidad_actual')
+        if cantidad_inicial and int(cantidad_inicial) > 0:
+            MovimientoInventario.objects.create(
+                item=instance,
+                tipo='ingreso',
+                cantidad=int(cantidad_inicial),
+                cantidad_anterior=0,
+                cantidad_nueva=int(cantidad_inicial),
+                notas='Stock inicial',
+                registrado_por=self.request.user
             )
+    
+    def perform_update(self, serializer):
+        """Actualiza el item y crea movimiento si cambia cantidad_actual"""
+        instance = serializer.instance
+        
+        # Calcular cantidad actual antes del update
+        from django.db.models import Sum
+        movimientos = instance.movimientos.all()
+        ingresos = movimientos.filter(tipo='ingreso').aggregate(total=Sum('cantidad'))['total'] or 0
+        egresos = movimientos.filter(tipo='egreso').aggregate(total=Sum('cantidad'))['total'] or 0
+        cantidad_anterior = ingresos - egresos
+        
+        # Guardar el item
+        instance = serializer.save()
+        
+        # Si se envió cantidad_actual y es diferente, crear movimiento de ajuste
+        cantidad_nueva = self.request.data.get('cantidad_actual')
+        if cantidad_nueva is not None:
+            cantidad_nueva = int(cantidad_nueva)
+            if cantidad_nueva != cantidad_anterior:
+                # Determinar si es ingreso o egreso
+                diferencia = cantidad_nueva - cantidad_anterior
+                tipo = 'ingreso' if diferencia > 0 else 'egreso'
+                cantidad = abs(diferencia)
+                
+                MovimientoInventario.objects.create(
+                    item=instance,
+                    tipo=tipo,
+                    cantidad=cantidad,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=cantidad_nueva,
+                    notas='Ajuste manual de stock',
+                    registrado_por=self.request.user
+                )
 
 
 # ============================================
@@ -458,46 +487,6 @@ class MeView(APIView):
 
 # ============================================
 # VISTAS DE DASHBOARD
-# ============================================
-
-class DashboardStatsView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        hoy = date.today()
-        
-        # Estadísticas generales
-        total_estudiantes = Estudiante.objects.filter(is_active=True).count()
-        total_personal = Usuario.objects.filter(is_active=True).count()
-        
-        # Asistencia de hoy
-        asistencia_hoy = Asistencia.objects.filter(
-            fecha=hoy,
-            is_active=True
-        ).select_related('estado').values('estado__nombre').annotate(total=Count('id'))
-        
-        # Inventario por estado
-        inventario_stats = Inventario.objects.filter(
-            is_active=True
-        ).values('estado__nombre').annotate(total=Count('id'))
-        
-        return Response({
-            'estudiantes': {
-                'total': total_estudiantes,
-            },
-            'personal': {
-                'total': total_personal,
-            },
-            'asistencia_hoy': {
-                'fecha': hoy,
-                'por_estado': list(asistencia_hoy)
-            },
-            'inventario': {
-                'por_estado': list(inventario_stats)
-            }
-        })
-
-
 # ============================================
 # VIEWSETS PARA CUOTAS Y FINANZAS
 # ============================================
@@ -704,7 +693,29 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):
-        serializer.save(registrado_por=self.request.user)
+        """Crea el movimiento calculando cantidad_anterior y cantidad_nueva automáticamente"""
+        item = serializer.validated_data['item']
+        tipo = serializer.validated_data['tipo']
+        cantidad = serializer.validated_data['cantidad']
+        
+        # Calcular cantidad actual (antes del movimiento)
+        movimientos = MovimientoInventario.objects.filter(item=item)
+        ingresos = movimientos.filter(tipo='ingreso').aggregate(total=Sum('cantidad'))['total'] or 0
+        egresos = movimientos.filter(tipo='egreso').aggregate(total=Sum('cantidad'))['total'] or 0
+        cantidad_anterior = ingresos - egresos
+        
+        # Calcular nueva cantidad
+        if tipo == 'ingreso':
+            cantidad_nueva = cantidad_anterior + cantidad
+        else:  # egreso
+            cantidad_nueva = cantidad_anterior - cantidad
+        
+        # Guardar con los campos calculados
+        serializer.save(
+            registrado_por=self.request.user,
+            cantidad_anterior=cantidad_anterior,
+            cantidad_nueva=cantidad_nueva
+        )
 
 
 # ============================================
@@ -731,9 +742,9 @@ class DashboardStatsView(APIView):
             # Asistencias de apoderados de hoy
             asistencias_apoderados_hoy = AsistenciaApoderado.objects.filter(fecha=today).count()
             
-            # Inventario
-            total_inventario = Inventario.objects.filter(is_active=True, estado__nombre='Disponible').count()
-            inventario_mantenimiento = Inventario.objects.filter(is_active=True, estado__nombre='En mantenimiento').count()
+            # Inventario - total de items activos
+            total_inventario = Inventario.objects.filter(is_active=True).count()
+            inventario_mantenimiento = 0  # Ya no usamos estados
             
             # Transacciones del mes
             transacciones_mes = Transaccion.objects.filter(

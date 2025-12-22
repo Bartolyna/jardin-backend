@@ -10,7 +10,6 @@ router.register(r'roles', views.RolViewSet, basename='rol')
 router.register(r'jornadas', views.JornadaViewSet, basename='jornada')
 router.register(r'salones', views.SalonViewSet, basename='salon')
 router.register(r'estados-asistencia', views.EstadoAsistenciaViewSet, basename='estado-asistencia')
-router.register(r'estados-inventario', views.EstadoInventarioViewSet, basename='estado-inventario')
 router.register(r'categorias', views.CategoriaViewSet, basename='categoria')
 
 # Registrar ViewSets de entidades principales
@@ -20,16 +19,11 @@ router.register(r'estudiantes', views.EstudianteViewSet, basename='estudiante')
 router.register(r'asistencias', views.AsistenciaViewSet, basename='asistencia')
 router.register(r'asistencias-apoderados', views.AsistenciaApoderadoViewSet, basename='asistencia-apoderado')
 router.register(r'inventario', views.InventarioViewSet, basename='inventario')
-
-# Registrar ViewSets de cuotas y finanzas
-router.register(r'cuotas', views.CuotaViewSet, basename='cuota')
-router.register(r'transacciones', views.TransaccionViewSet, basename='transaccion')
 router.register(r'movimientos-inventario', views.MovimientoInventarioViewSet, basename='movimiento-inventario')
 
 # Registrar ViewSets de cuotas y finanzas
 router.register(r'cuotas', views.CuotaViewSet, basename='cuota')
 router.register(r'transacciones', views.TransaccionViewSet, basename='transaccion')
-router.register(r'movimientos-inventario', views.MovimientoInventarioViewSet, basename='movimiento-inventario')
 
 urlpatterns = [
     # Endpoints de autenticación

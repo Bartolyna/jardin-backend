@@ -106,8 +106,8 @@ class AsistenciaApoderadoAdmin(admin.ModelAdmin):
 
 @admin.register(Inventario)
 class InventarioAdmin(admin.ModelAdmin):
-    list_display = ('id', 'codigo', 'nombre', 'categoria', 'estado', 'responsable', 'is_active')
-    list_filter = ('categoria', 'estado', 'is_active', 'fecha_ingreso')
+    list_display = ('id', 'codigo', 'nombre', 'categoria', 'stock_minimo', 'is_active')
+    list_filter = ('categoria', 'is_active')
     search_fields = ('codigo', 'nombre')
     ordering = ('codigo',)
     readonly_fields = ('created_at', 'updated_at', 'deleted_at')
