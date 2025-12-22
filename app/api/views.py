@@ -308,7 +308,7 @@ class AsistenciaViewSet(viewsets.ModelViewSet):
 # ============================================
 
 class AsistenciaApoderadoViewSet(viewsets.ModelViewSet):
-    queryset = AsistenciaApoderado.objects.filter(is_active=True).select_related('estudiante')
+    queryset = AsistenciaApoderado.objects.select_related('estudiante')
     serializer_class = AsistenciaApoderadoSerializer
     permission_classes = [permissions.IsAuthenticated]
     
@@ -316,16 +316,46 @@ class AsistenciaApoderadoViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         fecha = self.request.query_params.get('fecha')
         estudiante = self.request.query_params.get('estudiante')
-        tipo_evento = self.request.query_params.get('tipo_evento')
+        numero_reunion = self.request.query_params.get('numero_reunion')
         
         if fecha:
             queryset = queryset.filter(fecha=fecha)
         if estudiante:
             queryset = queryset.filter(estudiante_id=estudiante)
-        if tipo_evento:
-            queryset = queryset.filter(tipo_evento=tipo_evento)
+        if numero_reunion:
+            queryset = queryset.filter(numero_reunion=numero_reunion)
         
-        return queryset.order_by('-fecha', '-hora')
+        return queryset.order_by('-fecha', '-id')
+    
+    def create(self, request, *args, **kwargs):
+        """Validar que no exista duplicado antes de crear"""
+        estudiante_id = request.data.get('estudiante')
+        fecha = request.data.get('fecha')
+        numero_reunion = request.data.get('numero_reunion')
+        
+        # Verificar si ya existe un registro para este estudiante en esta fecha/reunión
+        filters = {
+            'estudiante_id': estudiante_id,
+            'fecha': fecha
+        }
+        
+        # Si hay número de reunión, validar por reunión específica
+        if numero_reunion:
+            filters['numero_reunion'] = numero_reunion
+            if AsistenciaApoderado.objects.filter(**filters).exists():
+                return Response(
+                    {'error': f'El apoderado de este niño ya registró asistencia para la reunión #{numero_reunion}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            # Si no hay número de reunión, validar que no haya registrado en esta fecha
+            if AsistenciaApoderado.objects.filter(**filters).exists():
+                return Response(
+                    {'error': 'El apoderado de este niño ya registró asistencia hoy'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return super().create(request, *args, **kwargs)
 
 
 # ============================================

@@ -343,29 +343,17 @@ class Asistencia(TimeStampedModel):
 # 6. TABLA ASISTENCIA APODERADO
 # ============================================
 
-class AsistenciaApoderado(BaseModel):
+class AsistenciaApoderado(TimeStampedModel):
     """Modelo para el registro de asistencia de apoderados"""
     estudiante = models.ForeignKey(
         Estudiante,
-        on_delete=models.PROTECT,  # PROTECT en lugar de CASCADE
+        on_delete=models.PROTECT,
         related_name='asistencias_apoderados',
         verbose_name="Estudiante"
     )
     nombre_apoderado = models.CharField(max_length=100, verbose_name="Nombre del apoderado")
     fecha = models.DateField(verbose_name="Fecha")
-    hora = models.TimeField(null=True, blank=True, verbose_name="Hora")
-    tipo_evento = models.CharField(
-        max_length=50,
-        choices=[
-            ('reunion', 'Reunión'),
-            ('entrevista', 'Entrevista'),
-            ('retiro', 'Retiro anticipado'),
-            ('otro', 'Otro'),
-        ],
-        default='reunion',
-        verbose_name="Tipo de evento"
-    )
-    observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    numero_reunion = models.PositiveIntegerField(null=True, blank=True, verbose_name="Número de reunión")
     
     class Meta:
         db_table = 'asistencia_apoderado'
@@ -374,6 +362,12 @@ class AsistenciaApoderado(BaseModel):
         indexes = [
             models.Index(fields=['fecha'], name='idx_asist_apod_fecha'),
             models.Index(fields=['estudiante'], name='idx_asist_apod_estudiante'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['estudiante', 'fecha'],
+                name='unique_estudiante_fecha_asistencia_apoderado'
+            )
         ]
         ordering = ['-fecha']
     

@@ -194,7 +194,7 @@ class AsistenciaApoderadoSerializer(serializers.ModelSerializer):
         model = AsistenciaApoderado
         fields = [
             'id', 'estudiante', 'estudiante_nombre', 'nombre_apoderado', 'fecha',
-            'hora', 'tipo_evento', 'observaciones', 'is_active', 'created_at', 'updated_at'
+            'numero_reunion', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
