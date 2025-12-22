@@ -312,7 +312,7 @@ class TransaccionSerializer(serializers.ModelSerializer):
             'cuota', 'cuota_info', 'registrado_por', 'registrado_por_nombre',
             'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'registrado_por']
     
     def get_cuota_info(self, obj):
         if obj.cuota:
