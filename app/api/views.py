@@ -705,3 +705,159 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(registrado_por=self.request.user)
+
+
+# ============================================
+# DASHBOARD
+# ============================================
+
+class DashboardStatsView(APIView):
+    """
+    Vista para obtener estadísticas del dashboard
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            today = date.today()
+            first_day_month = today.replace(day=1)
+            
+            # Estudiantes activos
+            estudiantes_activos = Estudiante.objects.filter(is_active=True).count()
+            
+            # Asistencias de hoy
+            asistencias_hoy = Asistencia.objects.filter(fecha=today).count()
+            
+            # Asistencias de apoderados de hoy
+            asistencias_apoderados_hoy = AsistenciaApoderado.objects.filter(fecha=today).count()
+            
+            # Inventario
+            total_inventario = Inventario.objects.filter(is_active=True, estado__nombre='Disponible').count()
+            inventario_mantenimiento = Inventario.objects.filter(is_active=True, estado__nombre='En mantenimiento').count()
+            
+            # Transacciones del mes
+            transacciones_mes = Transaccion.objects.filter(
+                fecha__gte=first_day_month,
+                fecha__lte=today
+            )
+            
+            ingresos_mes = transacciones_mes.filter(tipo='ingreso').aggregate(
+                total=Sum('monto')
+            )['total'] or 0
+            
+            egresos_mes = transacciones_mes.filter(tipo='egreso').aggregate(
+                total=Sum('monto')
+            )['total'] or 0
+            
+            balance_mes = ingresos_mes - egresos_mes
+            
+            # Próximos cumpleaños (próximos 7 días)
+            proximos_cumpleanos = []
+            for i in range(7):
+                dia_check = today + timedelta(days=i)
+                estudiantes = Estudiante.objects.filter(
+                    is_active=True,
+                    fecha_nacimiento__month=dia_check.month,
+                    fecha_nacimiento__day=dia_check.day
+                ).values('nombre', 'fecha_nacimiento')
+                
+                for estudiante in estudiantes:
+                    proximos_cumpleanos.append({
+                        'nombre': estudiante['nombre'],
+                        'fecha': estudiante['fecha_nacimiento'].isoformat(),
+                        'dias_restantes': i
+                    })
+            
+            return Response({
+                'estudiantes_activos': estudiantes_activos,
+                'asistencias_hoy': asistencias_hoy,
+                'asistencias_apoderados_hoy': asistencias_apoderados_hoy,
+                'total_inventario': total_inventario,
+                'inventario_mantenimiento': inventario_mantenimiento,
+                'ingresos_mes': float(ingresos_mes),
+                'egresos_mes': float(egresos_mes),
+                'balance_mes': float(balance_mes),
+                'proximos_cumpleanos': proximos_cumpleanos,
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# ============================================
+# DASHBOARD
+# ============================================
+
+@api_view(['GET'])
+def dashboard_stats(request):
+    """
+    Endpoint para obtener estadísticas del dashboard
+    """
+    try:
+        today = date.today()
+        first_day_month = today.replace(day=1)
+        
+        # Estudiantes activos
+        estudiantes_activos = Estudiante.objects.filter(is_active=True).count()
+        
+        # Asistencias de hoy
+        asistencias_hoy = Asistencia.objects.filter(fecha=today).count()
+        
+        # Asistencias de apoderados de hoy
+        asistencias_apoderados_hoy = AsistenciaApoderado.objects.filter(fecha=today).count()
+        
+        # Inventario
+        total_inventario = Inventario.objects.filter(is_active=True, estado__nombre='Disponible').count()
+        inventario_mantenimiento = Inventario.objects.filter(is_active=True, estado__nombre='En mantenimiento').count()
+        
+        # Transacciones del mes
+        transacciones_mes = Transaccion.objects.filter(
+            fecha__gte=first_day_month,
+            fecha__lte=today
+        )
+        
+        ingresos_mes = transacciones_mes.filter(tipo='ingreso').aggregate(
+            total=Sum('monto')
+        )['total'] or 0
+        
+        egresos_mes = transacciones_mes.filter(tipo='egreso').aggregate(
+            total=Sum('monto')
+        )['total'] or 0
+        
+        balance_mes = ingresos_mes - egresos_mes
+        
+        # Próximos cumpleaños (próximos 7 días)
+        proximos_cumpleanos = []
+        for i in range(7):
+            dia_check = today + timedelta(days=i)
+            estudiantes = Estudiante.objects.filter(
+                is_active=True,
+                fecha_nacimiento__month=dia_check.month,
+                fecha_nacimiento__day=dia_check.day
+            ).values('nombre', 'apellido', 'fecha_nacimiento')
+            
+            for estudiante in estudiantes:
+                proximos_cumpleanos.append({
+                    'nombre': f"{estudiante['nombre']} {estudiante['apellido']}",
+                    'fecha': estudiante['fecha_nacimiento'],
+                    'dias_restantes': i
+                })
+        
+        return Response({
+            'estudiantes_activos': estudiantes_activos,
+            'asistencias_hoy': asistencias_hoy,
+            'asistencias_apoderados_hoy': asistencias_apoderados_hoy,
+            'total_inventario': total_inventario,
+            'inventario_mantenimiento': inventario_mantenimiento,
+            'ingresos_mes': float(ingresos_mes),
+            'egresos_mes': float(egresos_mes),
+            'balance_mes': float(balance_mes),
+            'proximos_cumpleanos': proximos_cumpleanos,
+        })
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
